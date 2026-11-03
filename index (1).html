@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#101827">
+<title>myLUAS | Live Dublin Tram Times</title>
+<style>
+:root{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#f8fafc;background:#0b1220}*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at top right,#213958 0,transparent 46%),#0b1220}.wrap{width:min(820px,100%);margin:auto;padding:24px 18px 42px}header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:30px}.logo{font-size:1.8rem;font-weight:850;letter-spacing:-.055em}.logo span{color:#75d9bb}.live{display:flex;align-items:center;gap:7px;color:#b9d7cc;font-size:.8rem}.dot{width:8px;height:8px;background:#2dd4a1;border-radius:50%;box-shadow:0 0 0 4px #2dd4a12a}h1{font-size:clamp(2rem,8vw,3.4rem);letter-spacing:-.06em;line-height:1.08;margin:0 0 9px}p.lead{color:#aabbd1;margin:0 0 28px}.panel{background:#172235;border:1px solid #304058;border-radius:20px;padding:20px;margin-bottom:17px;box-shadow:0 12px 28px #0002}label{font-weight:700;display:block;margin-bottom:10px}select{appearance:none;background:#0d1829;color:#fff;border:1px solid #50627b;border-radius:12px;padding:15px;width:100%;font:inherit;font-weight:600;cursor:pointer}.hint{font-size:.81rem;color:#9fb3c9;margin:11px 0 0}.topline{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}.topline h2{font-size:1.2rem;margin:0}.time{font-size:.78rem;color:#a9bdd1;text-align:right}.direction{border-radius:17px;padding:19px;background:#172235;border:1px solid #304058;margin-bottom:16px}.dirhead{display:flex;align-items:center;gap:10px;margin-bottom:14px}.track{width:6px;height:28px;border-radius:10px;background:#fa515b}.track.green{background:#48cf89}.dirhead h3{font-size:1rem;margin:0}.trams{display:grid;gap:9px}.tram{display:flex;justify-content:space-between;align-items:center;gap:15px;background:#0d1829;border-radius:12px;padding:14px 15px}.destination{font-weight:600}.mins{white-space:nowrap;font-size:1.3rem;font-weight:850;font-variant-numeric:tabular-nums;color:#80ead1}.mins small{font-size:.65rem;font-weight:500;color:#b8c9d9}.service{margin:17px 0;color:#c5d3e2;background:#172235;border-left:3px solid #70baf4;padding:14px;border-radius:9px;font-size:.91rem;line-height:1.5}.error{display:none;background:#4b1d2a;color:#ffd9df;border:1px solid #ad5264;border-radius:12px;padding:14px;margin:14px 0;overflow-wrap:anywhere}.empty{color:#b1c4d6;padding:12px 0}.bottom{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}button{background:#77dec0;color:#061a16;font:inherit;font-weight:800;border:0;padding:11px 17px;border-radius:10px;cursor:pointer}button:disabled{opacity:.5;cursor:wait}footer{color:#91a8c1;text-align:center;font-size:.79rem;line-height:1.6;margin-top:29px}a{color:#93dcfa}@media(min-width:650px){.wrap{padding-top:42px}.directions{display:grid;grid-template-columns:1fr 1fr;gap:15px}.direction{margin:0}.panel{padding:24px}}
+</style>
+</head>
+<body>
+<main class="wrap">
+<header><div class="logo">my<span>LUAS</span></div><div class="live"><i class="dot" aria-hidden="true"></i> LIVE ARRIVALS</div></header>
+<h1>Your next tram.<br>At a glance.</h1>
+<p class="lead">Real-time Dublin Luas arrival forecasts, refreshed every 20 seconds.</p>
+<section class="panel"><label for="stop">Choose a Luas stop</label><select id="stop" aria-label="Choose Luas stop"><option value="MYS">Mayor Square - NCI (loading stops…)</option></select><div class="hint">Your selected stop is saved on this device.</div></section>
+<div class="topline"><h2 id="stopName">Mayor Square - NCI</h2><span class="time" id="updated">Connecting…</span></div>
+<div id="error" class="error" role="alert"></div>
+<div id="directions" class="directions" aria-live="polite"><div class="direction"><div class="empty">Loading live trams…</div></div></div>
+<div id="service" class="service">Checking service information…</div>
+<div class="bottom"><span class="hint">Updates automatically every 20 seconds.</span><button id="refresh" type="button">Refresh now</button></div>
+<footer>Data: Transport Infrastructure Ireland. Built by Ahmed for BDAIB.<br>Live data via the BDAIB class relay. Arrival times may change.</footer>
+</main>
+<script>
+(() => {
+'use strict';
+const BASE='https://luas-class.kluxy.app';
+const $=id=>document.getElementById(id);
+const select=$('stop'),directions=$('directions'),error=$('error'),updated=$('updated'),name=$('stopName'),service=$('service'),refresh=$('refresh');
+let busy=false;
+function showError(message){error.textContent='Unable to load live data: '+message;error.style.display='block'}
+function clearError(){error.textContent='';error.style.display='none'}
+async function getJSON(url){const res=await fetch(url,{cache:'no-store'});if(!res.ok)throw new Error('Server returned '+res.status+' '+res.statusText);return res.json()}
+function tramRow(tram){const row=document.createElement('div');row.className='tram';const dest=document.createElement('span');dest.className='destination';dest.textContent=tram.destination||'Destination unavailable';const time=document.createElement('span');time.className='mins';const raw=tram.due;const n=Number(raw);if(raw===0||String(raw).trim()==='0'||String(raw).toLowerCase()==='due'){time.textContent='Due'}else if(Number.isFinite(n)&&String(raw).trim()!==''){time.textContent=String(n)+' ';const small=document.createElement('small');small.textContent='min';time.appendChild(small)}else{time.textContent=raw==null?'—':String(raw)}row.append(dest,time);return row}
+function render(data){directions.replaceChildren();name.textContent=data.stopName||select.selectedOptions[0]?.textContent||'Your stop';let count=0;for(const group of (Array.isArray(data.directions)?data.directions:[])){const panel=document.createElement('section');panel.className='direction';const heading=document.createElement('div');heading.className='dirhead';const track=document.createElement('span');track.className='track'+(select.selectedOptions[0]?.parentElement?.label==='Green Line'?' green':'');const title=document.createElement('h3');title.textContent=group.name||'Direction';heading.append(track,title);panel.appendChild(heading);const trams=document.createElement('div');trams.className='trams';const entries=Array.isArray(group.trams)?group.trams.slice(0,3):[];if(entries.length){entries.forEach(t=>trams.appendChild(tramRow(t)));count+=entries.length}else{const blank=document.createElement('div');blank.className='empty';blank.textContent='No trams currently forecast';trams.appendChild(blank)}panel.appendChild(trams);directions.appendChild(panel)}if(!directions.children.length){const blank=document.createElement('div');blank.className='direction empty';blank.textContent='No direction information available for this stop.';directions.appendChild(blank)}service.textContent=data.message||'No service alerts reported.';updated.textContent='Last updated '+new Date().toLocaleTimeString('en-IE',{hour:'2-digit',minute:'2-digit',second:'2-digit'});}
+async function loadStops(){try{const result=await getJSON(BASE+'/stops');if(!Array.isArray(result.stops))throw new Error('Unexpected stop list format');const previous=localStorage.getItem('myluas-stop')||'MYS';select.replaceChildren();for(const [line,title] of [['red','Red Line'],['green','Green Line']]){const group=document.createElement('optgroup');group.label=title;for(const stop of result.stops.filter(s=>String(s.line).toLowerCase()===line)){const option=document.createElement('option');option.value=stop.id;option.textContent=stop.name;group.appendChild(option)}select.appendChild(group)}const available=Array.from(select.options).some(o=>o.value===previous);select.value=available?previous:'MYS';if(!select.value&&select.options.length)select.selectedIndex=0;await loadForecast()}catch(e){showError('Stop list: '+e.message);await loadForecast()}}
+async function loadForecast(){if(busy)return;busy=true;refresh.disabled=true;const stop=select.value||'MYS';try{const data=await getJSON(BASE+'/forecast?stop='+encodeURIComponent(stop));if(stop!==select.value)return;render(data);clearError()}catch(e){showError(e.message);updated.textContent='Update failed · '+new Date().toLocaleTimeString('en-IE')}finally{busy=false;refresh.disabled=false}}
+select.addEventListener('change',()=>{try{localStorage.setItem('myluas-stop',select.value)}catch(e){}name.textContent=select.selectedOptions[0]?.textContent||'Your stop';loadForecast()});refresh.addEventListener('click',loadForecast);loadStops();setInterval(loadForecast,20000);
+})();
+</script>
+</body>
+</html>
